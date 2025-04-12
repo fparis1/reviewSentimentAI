@@ -7,12 +7,13 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
+from sklearn.pipeline import Pipeline
 from sklearn.metrics import roc_auc_score, roc_curve
 
 # Ako prvi put koristite nltk stop riječi, otkomentirajte sljedeću liniju:
 # nltk.download('stopwords')
 
-# Učitavanje skupa podataka (datoteka 'IMDB Dataset.csv' treba biti u radnom direktoriju)
+# Učitavanje skupa podataka
 df = pd.read_csv('IMDB Dataset.csv')
 print("Prvih 5 redaka skupa podataka:")
 print(df.head())
@@ -37,31 +38,31 @@ X_train, X_test, y_train, y_test = train_test_split(
     df['clean_review'], df['sentiment_binary'], test_size=0.2, random_state=42
 )
 
-# Transformacija teksta u TF-IDF značajke
-tfidf_vectorizer = TfidfVectorizer()
-X_train_tfidf = tfidf_vectorizer.fit_transform(X_train)
-X_test_tfidf = tfidf_vectorizer.transform(X_test)
+# Kreiranje pipeline-a sa definiranim vrijednostima parametara:
+# - TfidfVectorizer: n-gram opseg (1, 2), max_df = 0.85, min_df = 1
+# - MultinomialNB: alpha = 0.1
+pipeline = Pipeline([
+    ('tfidf', TfidfVectorizer(ngram_range=(1, 2), max_df=0.85, min_df=1)),
+    ('nb', MultinomialNB(alpha=0.1))
+])
 
-# Treniranje Naivnog Bayesovog klasifikatora
-nb_classifier = MultinomialNB()
-nb_classifier.fit(X_train_tfidf, y_train)
+# Treniranje modela na trening skupu
+pipeline.fit(X_train, y_train)
 
-# Predikcija vjerojatnosti za pozitivnu klasu
-y_proba = nb_classifier.predict_proba(X_test_tfidf)[:, 1]
-
-# Evaluacija modela korištenjem ROC-AUC metrike
+# Evaluacija modela na test skupu
+y_proba = pipeline.predict_proba(X_test)[:, 1]
 roc_auc = roc_auc_score(y_test, y_proba)
-print("ROC-AUC:", roc_auc)
+print("\nROC-AUC na test skupu:", roc_auc)
 
 # Izračunavanje vrijednosti za ROC krivulju
 fpr, tpr, thresholds = roc_curve(y_test, y_proba)
 
 # Generiranje grafičkog prikaza ROC krivulje
 plt.figure()
-plt.plot(fpr, tpr, label=f'ROC curve (area = {roc_auc:.2f})')
+plt.plot(fpr, tpr, label=f'ROC krivulja (area = {roc_auc:.2f})')
 plt.plot([0, 1], [0, 1], 'k--')  # linija slučajne klasifikacije
-plt.xlabel('False Positive Rate')
-plt.ylabel('True Positive Rate')
-plt.title('Receiver Operating Characteristic (ROC) Curve')
+plt.xlabel('Lažno pozitivna stopa (FPR)')
+plt.ylabel('Istinski pozitivna stopa (TPR)')
+plt.title('ROC krivulja')
 plt.legend(loc='lower right')
 plt.show()
