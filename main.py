@@ -8,61 +8,171 @@ from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import roc_auc_score, roc_curve
+from sklearn.metrics import roc_auc_score, roc_curve, precision_recall_curve, confusion_matrix
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import tkinter as tk
+from tkinter import ttk
+import numpy as np
+import sys
 
-# Ako prvi put koristite nltk stop riječi, otkomentirajte sljedeću liniju:
+# Status: Starting execution
+print("[Status] Starting sentiment analysis GUI script execution...")
+
+# Uncomment if needed to download stopwords
 # nltk.download('stopwords')
 
-# Učitavanje skupa podataka
-df = pd.read_csv('IMDB Dataset.csv')
-print("Prvih 5 redaka skupa podataka:")
-print(df.head())
+# Status: Loading dataset
+print("[Status] Loading dataset from 'IMDB Dataset.csv'...")
+DF = pd.read_csv('IMDB Dataset.csv')
+print(f"[Status] Dataset loaded: {len(DF)} records.")
 
-# Funkcija za čišćenje teksta: mala slova, uklanjanje interpunkcije i stop riječi
+# Define text cleaning function
+print("[Status] Defining text cleaning function...")
 def clean_text(text):
     text = text.lower()
-    text = re.sub(r'[' + string.punctuation + ']', '', text)
+    text = re.sub(fr"[{string.punctuation}]", "", text)
     tokens = text.split()
-    stop_words = set(stopwords.words('english'))
-    tokens = [word for word in tokens if word not in stop_words]
+    sw = set(stopwords.words('english'))
+    tokens = [w for w in tokens if w not in sw]
     return ' '.join(tokens)
 
-# Primjena čišćenja na recenzije
-df['clean_review'] = df['review'].apply(clean_text)
+# Status: Preprocessing text
+print(f"[Status] Cleaning {len(DF)} reviews...")
+DF['clean_review'] = DF['review'].apply(clean_text)
+print("[Status] Text cleaning complete.")
 
-# Pretvorba oznaka sentimenta u binarni oblik ('positive' -> 1, 'negative' -> 0)
-df['sentiment_binary'] = df['sentiment'].apply(lambda x: 1 if x == 'positive' else 0)
+# Convert labels
+print("[Status] Converting sentiment labels to binary...")
+DF['sentiment_binary'] = DF['sentiment'].map({'positive': 1, 'negative': 0})
 
-# Podjela podataka na trening i test skup (80%/20%)
+# Status: Splitting dataset
+print("[Status] Splitting data into train/test (80/20)...")
 X_train, X_test, y_train, y_test = train_test_split(
-    df['clean_review'], df['sentiment_binary'], test_size=0.2, random_state=42
+    DF['clean_review'], DF['sentiment_binary'], test_size=0.2, random_state=42
 )
+print(f"[Status] Split done: {len(X_train)} train, {len(X_test)} test samples.")
 
-# Kreiranje pipeline-a sa definiranim vrijednostima parametara:
-# - TfidfVectorizer: n-gram opseg (1, 2), max_df = 0.85, min_df = 1
-# - MultinomialNB: alpha = 0.1
-pipeline = Pipeline([
+# Build and train model
+print("[Status] Building pipeline and training model...")
+model = Pipeline([
     ('tfidf', TfidfVectorizer(ngram_range=(1, 2), max_df=0.85, min_df=1)),
     ('nb', MultinomialNB(alpha=0.1))
 ])
+model.fit(X_train, y_train)
+print("[Status] Model training complete.")
 
-# Treniranje modela na trening skupu
-pipeline.fit(X_train, y_train)
-
-# Evaluacija modela na test skupu
-y_proba = pipeline.predict_proba(X_test)[:, 1]
+# Predictions & metrics
+print("[Status] Generating predictions and computing metrics...")
+y_proba = model.predict_proba(X_test)[:, 1]
 roc_auc = roc_auc_score(y_test, y_proba)
-print("\nROC-AUC na test skupu:", roc_auc)
+fpr, tpr, _ = roc_curve(y_test, y_proba)
+prec, rec, _ = precision_recall_curve(y_test, y_proba)
+y_pred = (y_proba >= 0.5).astype(int)
+cm = confusion_matrix(y_test, y_pred)
+print(f"[Status] ROC-AUC: {roc_auc:.4f}")
 
-# Izračunavanje vrijednosti za ROC krivulju
-fpr, tpr, thresholds = roc_curve(y_test, y_proba)
+# Histogram data
+print("[Status] Computing review length distribution...")
+def_lengths = DF['clean_review'].str.split().apply(len)
 
-# Generiranje grafičkog prikaza ROC krivulje
-plt.figure()
-plt.plot(fpr, tpr, label=f'ROC krivulja (area = {roc_auc:.2f})')
-plt.plot([0, 1], [0, 1], 'k--')  # linija slučajne klasifikacije
-plt.xlabel('Lažno pozitivna stopa (FPR)')
-plt.ylabel('Istinski pozitivna stopa (TPR)')
-plt.title('ROC krivulja')
-plt.legend(loc='lower right')
-plt.show()
+# Define plot functions
+print("[Status] Defining plot functions...")
+def plot_roc():
+    print("[Status] Plotting ROC Curve...")
+    fig, ax = plt.subplots()
+    ax.plot(fpr, tpr, label=f'ROC (AUC = {roc_auc:.2f})')
+    ax.plot([0,1], [0,1], 'k--')
+    ax.set_xlabel('False Positive Rate')
+    ax.set_ylabel('True Positive Rate')
+    ax.set_title('ROC Curve')
+    ax.legend()
+    fig.tight_layout()
+    return fig
+
+
+def plot_pr():
+    print("[Status] Plotting Precision-Recall Curve...")
+    fig, ax = plt.subplots()
+    ax.plot(rec, prec, label='Precision-Recall')
+    ax.set_xlabel('Recall')
+    ax.set_ylabel('Precision')
+    ax.set_title('Precision-Recall Curve')
+    ax.legend()
+    fig.tight_layout()
+    return fig
+
+
+def plot_cm():
+    print("[Status] Plotting Confusion Matrix...")
+    fig, ax = plt.subplots()
+    cax = ax.matshow(cm, cmap='Blues')
+    for (i, j), val in np.ndenumerate(cm):
+        ax.text(j, i, val, ha='center', va='center')
+    ax.set_xlabel('Predicted')
+    ax.set_ylabel('Actual')
+    ax.set_title('Confusion Matrix')
+    fig.colorbar(cax)
+    fig.tight_layout()
+    return fig
+
+
+def plot_length_hist():
+    print("[Status] Plotting Length Distribution Histogram...")
+    fig, ax = plt.subplots()
+    ax.hist(def_lengths, bins=30)
+    ax.set_xlabel('Review Length (words)')
+    ax.set_ylabel('Frequency')
+    ax.set_title('Distribution of Review Lengths')
+    fig.tight_layout()
+    return fig
+
+plot_funcs = {
+    'ROC Curve': plot_roc,
+    'Precision-Recall': plot_pr,
+    'Confusion Matrix': plot_cm,
+    'Length Distribution': plot_length_hist
+}
+
+# Build Tkinter GUI
+print("[Status] Initializing Tkinter GUI...")
+root = tk.Tk()
+root.title('Sentiment Analysis Graph Visualizer')
+root.geometry('900x600')
+
+# Handle window close to exit cleanly
+print("[Status] Setting up close handler...")
+def on_closing():
+    print("[Status] Closing GUI and exiting...")
+    root.destroy()
+    sys.exit(0)
+root.protocol("WM_DELETE_WINDOW", on_closing)
+
+nav_frame = ttk.Frame(root, width=200)
+nav_frame.pack(side=tk.LEFT, fill=tk.Y)
+
+graph_frame = ttk.Frame(root)
+graph_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+# Function to display graphs
+print("[Status] Defining graph display function...")
+def display_graph(name):
+    print(f"[Status] Displaying graph: {name}")
+    for widget in graph_frame.winfo_children():
+        widget.destroy()
+    fig = plot_funcs[name]()  # generate fresh figure
+    canvas = FigureCanvasTkAgg(fig, master=graph_frame)
+    canvas.draw()
+    canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+# Add navigation buttons
+print("[Status] Adding navigation buttons...")
+for name in plot_funcs.keys():
+    btn = ttk.Button(nav_frame, text=name, command=lambda n=name: display_graph(n))
+    btn.pack(fill=tk.X, padx=5, pady=5)
+
+# Show default graph
+print("[Status] Displaying default graph (ROC Curve)...")
+display_graph('ROC Curve')
+
+print("[Status] Entering GUI main loop...")
+root.mainloop()
