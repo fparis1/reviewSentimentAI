@@ -16,13 +16,13 @@ import numpy as np
 import sys
 
 # Status: Starting execution
-print("[Status] Starting sentiment analysis GUI script execution...")
+print("[Status] Starting sentiment analysis GUI script execution.")
 
 # Uncomment if needed to download stopwords
 # nltk.download('stopwords')
 
 # Status: Loading dataset
-print("[Status] Loading dataset from 'IMDB Dataset.csv'...")
+print("[Status] Loading dataset from 'IMDB Dataset.csv'.")
 DF = pd.read_csv('IMDB Dataset.csv')
 print(f"[Status] Dataset loaded: {len(DF)} records.")
 
@@ -62,7 +62,7 @@ model.fit(X_train, y_train)
 print("[Status] Model training complete.")
 
 # Predictions & metrics
-print("[Status] Generating predictions and computing metrics...")
+print("[Status] Generating predictions and computing metrics.")
 y_proba = model.predict_proba(X_test)[:, 1]
 roc_auc = roc_auc_score(y_test, y_proba)
 fpr, tpr, _ = roc_curve(y_test, y_proba)
@@ -71,14 +71,11 @@ y_pred = (y_proba >= 0.5).astype(int)
 cm = confusion_matrix(y_test, y_pred)
 print(f"[Status] ROC-AUC: {roc_auc:.4f}")
 
-# Histogram data
-print("[Status] Computing review length distribution...")
-def_lengths = DF['clean_review'].str.split().apply(len)
-
 # Define plot functions
-print("[Status] Defining plot functions...")
+print("[Status] Defining plot functions.")
+
 def plot_roc():
-    print("[Status] Plotting ROC Curve...")
+    print("[Status] Plotting ROC Curve.")
     fig, ax = plt.subplots()
     ax.plot(fpr, tpr, label=f'ROC (AUC = {roc_auc:.2f})')
     ax.plot([0,1], [0,1], 'k--')
@@ -91,7 +88,7 @@ def plot_roc():
 
 
 def plot_pr():
-    print("[Status] Plotting Precision-Recall Curve...")
+    print("[Status] Plotting Precision-Recall Curve.")
     fig, ax = plt.subplots()
     ax.plot(rec, prec, label='Precision-Recall')
     ax.set_xlabel('Recall')
@@ -103,7 +100,7 @@ def plot_pr():
 
 
 def plot_cm():
-    print("[Status] Plotting Confusion Matrix...")
+    print("[Status] Plotting Confusion Matrix.")
     fig, ax = plt.subplots()
     cax = ax.matshow(cm, cmap='Blues')
     for (i, j), val in np.ndenumerate(cm):
@@ -116,13 +113,14 @@ def plot_cm():
     return fig
 
 
-def plot_length_hist():
-    print("[Status] Plotting Length Distribution Histogram...")
+def plot_prob_hist():
+    print("[Status] Plotting Predicted-Probability Histogram.")
     fig, ax = plt.subplots()
-    ax.hist(def_lengths, bins=30)
-    ax.set_xlabel('Review Length (words)')
-    ax.set_ylabel('Frequency')
-    ax.set_title('Distribution of Review Lengths')
+    ax.hist(y_proba, bins=30, edgecolor='k')
+    ax.set_xlabel('Predicted Positive Probability')
+    ax.set_ylabel('Count')
+    ax.set_title('Distribution of Predicted Probabilities')
+    ax.grid(alpha=0.3)
     fig.tight_layout()
     return fig
 
@@ -130,19 +128,19 @@ plot_funcs = {
     'ROC Curve': plot_roc,
     'Precision-Recall': plot_pr,
     'Confusion Matrix': plot_cm,
-    'Length Distribution': plot_length_hist
+    'Probability Histogram': plot_prob_hist
 }
 
 # Build Tkinter GUI
-print("[Status] Initializing Tkinter GUI...")
+print("[Status] Initializing Tkinter GUI.")
 root = tk.Tk()
 root.title('Sentiment Analysis Graph Visualizer')
 root.geometry('900x600')
 
 # Handle window close to exit cleanly
-print("[Status] Setting up close handler...")
+print("[Status] Setting up close handler.")
 def on_closing():
-    print("[Status] Closing GUI and exiting...")
+    print("[Status] Closing GUI and exiting.")
     root.destroy()
     sys.exit(0)
 root.protocol("WM_DELETE_WINDOW", on_closing)
@@ -154,7 +152,7 @@ graph_frame = ttk.Frame(root)
 graph_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
 # Function to display graphs
-print("[Status] Defining graph display function...")
+print("[Status] Defining graph display function.")
 def display_graph(name):
     print(f"[Status] Displaying graph: {name}")
     for widget in graph_frame.winfo_children():
@@ -165,14 +163,14 @@ def display_graph(name):
     canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
 # Add navigation buttons
-print("[Status] Adding navigation buttons...")
+print("[Status] Adding navigation buttons.")
 for name in plot_funcs.keys():
     btn = ttk.Button(nav_frame, text=name, command=lambda n=name: display_graph(n))
     btn.pack(fill=tk.X, padx=5, pady=5)
 
 # Show default graph
-print("[Status] Displaying default graph (ROC Curve)...")
+print("[Status] Displaying default graph (ROC Curve).")
 display_graph('ROC Curve')
 
-print("[Status] Entering GUI main loop...")
+print("[Status] Entering GUI main loop.")
 root.mainloop()
